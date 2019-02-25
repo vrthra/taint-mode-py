@@ -29,13 +29,13 @@ from itertools import chain
 __version__ = 'trunk-svn-2'
 
 __all__ = ['tainted', 'taint', 'untrusted', 'untrusted_args', 'ssink',
-           'validator', 'cleaner', 'STR', 'INT', 'FLOAT', 'UNICODE', 'chr',
+           'validator', 'cleaner', 'STR', 'INT', 'FLOAT', 'chr',
            'ord', 'len', 'ends_execution', 'XSS', 'SQLI', 'OSI', 'II']
 
 
 ENDS = False
 RAISES = False
-KEYS  = [XSS, SQLI, OSI, II] = range(1, 5)
+KEYS  = [XSS, SQLI, OSI, II] = list(range(1, 5))
 TAGS = set(KEYS)
 
 
@@ -80,7 +80,7 @@ def mapt(o, f, check=lambda o: type(o) in tclasses):
     elif isinstance(o, dict):
         klass = type(o) # It's quite common for frameworks to extend dict
                         # with useful new methdos - i.e. web.py
-        return klass((k, mapt(v, f, check)) for k, v in o.iteritems())
+        return klass((k, mapt(v, f, check)) for k, v in o.items())
     else:
         return o
 
@@ -157,19 +157,19 @@ def untrusted_args(nargs=[], nkwargs=[]):
 
     >>> @ssink(OSI)
     ... def exec_comand(cm):
-    ...     print "executing ", cm
+    ...     print("executing ", cm)
     ...
     >>> @untrusted_args([1])
     ... def rutine(auxvalue, command):
     ...     exec_comand(command)
-    ...     print auxvalue
+    ...     print(auxvalue)
     ...
     >>> rutine(42,"rm -r /")
     ===============================================================================
     Violation in line 3 from file <doctest __main__.untrusted_args[3]>
     Tainted value: rm -r /
     -------------------------------------------------------------------------------
-            print auxvalue
+            print(auxvalue)
     <BLANKLINE>
     ===============================================================================
     executing  rm -r /
@@ -207,15 +207,15 @@ def untrusted(f):
     >>> value
     'a string'
     >>> type(value)
-    <class '__main__.tklass'>
+    <class '__main__.taint_class.<locals>.tklass'>
     >>> tainted(value)
     True
 
     While using third-party modules, we still can apply the decorator. The next
     example is from a program writed using the web.py framework:
 
-    >>> import web
-    >>> web.input = untrusted(web.input)
+    > import web
+    > web.input = untrusted(web.input)
     '''
     def inner(*args, **kwargs):
         r = f(*args, **kwargs)
@@ -274,7 +274,7 @@ def cleaner(v):
 
     >>> @ssink(SQLI) #simulate a rutine that will execute an sql query
     ... def erase_employee(id):
-    ...     print "this value this value is placed in the WHERE clause of a sql delete statment:" , id
+    ...     print("this value this value is placed in the WHERE clause of a sql delete statment:" , id)
     >>> i=get_id_employee()
     >>> erase_employee(i)
     ===============================================================================
@@ -315,18 +315,18 @@ def reached(t, v=None):
     frame = sys._getframe(3)
     filename = inspect.getfile(frame)
     lno = frame.f_lineno
-    print "=" * 79
-    print "Violation in line %d from file %s" % (lno, filename)
+    print("=" * 79)
+    print("Violation in line %d from file %s" % (lno, filename))
     # Localize this message
-    print "Tainted value: %s" % t
-    print '-' * 79
+    print("Tainted value: %s" % t)
+    print('-' * 79)
     lineas = inspect.findsource(frame)[0]
     lineas = ['    %s' % l for l in lineas]
     lno = lno - 1
     lineas[lno] = '--> ' + lineas[lno][4:]
     lineas = lineas[lno - 3: lno + 3]
-    print "".join(lineas)
-    print "=" * 79
+    print("".join(lineas))
+    print("=" * 79)
 
 def ssink(v=None, reached=reached):
     '''
@@ -344,11 +344,11 @@ def ssink(v=None, reached=reached):
 
     The web.py framework offers SQL Injection sensitive sink examples:
 
-    >>> import web
-    >>> db = web.database(dbn="sqlite", db="DB_NAME")
-    >>> db.delete=ssink(SQLI)(db.delete)
-    >>> db.select = ssink(SQLI)(db.select)
-    >>> db.insert = ssink(SQLI)(db.insert)
+    > import web
+    > db = web.database(dbn="sqlite", db="DB_NAME")
+    > db.delete=ssink(SQLI)(db.delete)
+    > db.select = ssink(SQLI)(db.select)
+    > db.insert = ssink(SQLI)(db.insert)
 
     Like the rest of decorators, if the sensitive sink is defined in our code, we can
     use syntactic sugar:
@@ -379,7 +379,7 @@ def ssink(v=None, reached=reached):
 
     def _ssink(f):
         def inner(*args, **kwargs):
-            allargs = chain(args, kwargs.itervalues())
+            allargs = chain(args, iter(kwargs.values()))
             if v is None:   # sensitive to ALL
                 for a in allargs:
                     t = set()
@@ -439,7 +439,7 @@ def taint(o, v=None):
 
     >>> t = taint(42)
     >>> t.taints
-    set([1, 2, 3, 4])
+    {1, 2, 3, 4}
     >>> tainted(t, XSS)
     True
     >>> tainted(t, OSI)
@@ -456,7 +456,7 @@ def taint(o, v=None):
     42
     >>> t = taint(42, II)
     >>> t.taints
-    set([4])
+    {4}
     >>> tainted(t, II)
     True
     >>> tainted(t, OSI)
@@ -526,35 +526,28 @@ def taint_class(klass, methods=None):
     if '__add__' in methods and '__radd__' not in methods:
         setattr(tklass, '__radd__', lambda self, other:
                                     tklass.__add__(tklass(other), self))
-    # unicode __rmod__ returns NotImplemented
-    if klass == unicode:
-        setattr(tklass, '__rmod__', lambda self, other:
-                                    tklass.__mod__(tklass(other), self))
     return tklass
-
 
 dont_override = set(['__repr__', '__cmp__', '__getattribute__', '__new__',
                      '__init__','__nonzero__', '__reduce__', '__reduce_ex__',
-                     '__str__', '__int__', '__float__', '__unicode__'])
+                     '__str__', '__int__', '__float__'])
 
 
-# ------- Taint-aware classes for strings, integers, floats, and unicode ------
+# ------- Taint-aware classes for strings, integers, floats------
 
 def attributes(klass):
     a = set(klass.__dict__.keys())
     return a - dont_override
 
 str_methods = attributes(str)
-unicode_methods = attributes(unicode)
 int_methods = attributes(int)
 float_methods = attributes(float)
 
 STR = taint_class(str, str_methods)
-UNICODE = taint_class(unicode, unicode_methods)
 INT = taint_class(int, int_methods)
 FLOAT = taint_class(float, float_methods)
 
-tclasses = {str: STR, int: INT, float: FLOAT, unicode: UNICODE}
+tclasses = {str: STR, int: INT, float: FLOAT}
 
 def tclass(o):
     '''Tainted instance factory.'''
